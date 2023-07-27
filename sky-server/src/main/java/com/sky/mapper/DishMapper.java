@@ -19,7 +19,7 @@ public interface DishMapper {
     Integer countByCategoryId(Long categoryId);
 
     /**
-     * 插入菜品数据
+     * 插入菜品数据。公共字段自动填充注解
      * @param dish
      */
     @AutoFill(value = OperationType.INSERT)
