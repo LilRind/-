@@ -28,6 +28,7 @@ public class AliOssUtil {
      */
     public String upload(byte[] bytes, String objectName) {
 
+        // TODO 这里OSS服务还没开通，id secretkey等都没有配置
         // 创建OSSClient实例。
         OSS ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
 
