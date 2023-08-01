@@ -32,7 +32,8 @@ public interface SetmealMapper {
     void insert(Setmeal setmeal);
 
     /**
-     * 修改套餐
+     * 根据id修改套餐
+     *
      * @param setmeal
      */
     @AutoFill(OperationType.UPDATE)
@@ -44,8 +45,6 @@ public interface SetmealMapper {
      * @return
      */
     List<Setmeal> list(Setmeal setmeal);
-
-
 
     /**
      * 分页查询
@@ -78,5 +77,7 @@ public interface SetmealMapper {
             "from setmeal_dish sd left join dish d on sd.dish_id = d.id " +
             "where sd.setmeal_id = #{setmealId}")
     List<DishItemVO> getDishItemBySetmealId(Long setmealId);
+
+
 
 }

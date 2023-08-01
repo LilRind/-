@@ -17,3 +17,6 @@ sky:
     password: 123456
     # redis db0-db15 共16个数据库，默认维db0。
     database: 10
+  wechat:
+    appid: wxff06263d91a34197
+    secret: 45667b88b5cffc87ddff61bc27b8e1e0
