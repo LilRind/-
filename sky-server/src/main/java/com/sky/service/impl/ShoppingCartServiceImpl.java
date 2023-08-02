@@ -87,6 +87,13 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
     }
 
     /**
+     * 清空购物车商品
+     */
+    public void cleanShoppingCart() {
+        shoppingCartMapper.deleteByUserId(BaseContext.getCurrentId());
+    }
+
+    /**
      * 删除购物车中一个商品
      * @param shoppingCartDTO
      */

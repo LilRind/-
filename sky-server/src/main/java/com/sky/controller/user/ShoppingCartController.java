@@ -22,6 +22,19 @@ public class ShoppingCartController {
     private ShoppingCartService shoppingCartService;
 
     /**
+     * 添加购物车
+     * @param shoppingCartDTO
+     * @return
+     */
+    @PostMapping("/add")
+    @ApiOperation("添加购物车")
+    public Result<String> add(@RequestBody ShoppingCartDTO shoppingCartDTO){
+        log.info("添加购物车：{}", shoppingCartDTO);
+        shoppingCartService.addShoppingCart(shoppingCartDTO);//后绪步骤实现
+        return Result.success();
+    }
+
+    /**
      * 查看购物车
      * @return
      */
@@ -29,6 +42,17 @@ public class ShoppingCartController {
     @ApiOperation("查看购物车")
     public Result<List<ShoppingCart>> list(){
         return Result.success(shoppingCartService.showShoppingCart());
+    }
+
+    /**
+     * 清空购物车商品
+     * @return
+     */
+    @DeleteMapping("/clean")
+    @ApiOperation("清空购物车商品")
+    public Result<String> clean(){
+        shoppingCartService.cleanShoppingCart();
+        return Result.success();
     }
 
     /**
@@ -44,16 +68,5 @@ public class ShoppingCartController {
         return Result.success();
     }
 
-    /**
-     * 添加购物车
-     * @param shoppingCartDTO
-     * @return
-     */
-    @PostMapping("/add")
-    @ApiOperation("添加购物车")
-    public Result<String> add(@RequestBody ShoppingCartDTO shoppingCartDTO){
-        log.info("添加购物车：{}", shoppingCartDTO);
-        shoppingCartService.addShoppingCart(shoppingCartDTO);//后绪步骤实现
-        return Result.success();
-    }
+
 }
