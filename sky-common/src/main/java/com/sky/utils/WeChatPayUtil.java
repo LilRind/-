@@ -151,6 +151,7 @@ public class WeChatPayUtil {
         jsonObject.put("payer", payer);
 
         String body = jsonObject.toJSONString();
+        // 调用 JSAPI：微信支付下单接口地址
         return post(JSAPI, body);
     }
 
@@ -164,7 +165,7 @@ public class WeChatPayUtil {
      * @return
      */
     public JSONObject pay(String orderNum, BigDecimal total, String description, String openid) throws Exception {
-        //统一下单，生成预支付交易单
+        //统一下单，生成预支付交易单。bodyAsString：预支付交易标识
         String bodyAsString = jsapi(orderNum, total, description, openid);
         //解析返回结果
         JSONObject jsonObject = JSON.parseObject(bodyAsString);

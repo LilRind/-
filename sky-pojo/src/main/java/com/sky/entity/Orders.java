@@ -37,6 +37,11 @@ public class Orders implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
+    /**
+     * 取消原因 “用户取消”
+     */
+    public static final String USER_CANCELLED = "用户取消";
+
     private Long id;
 
     //订单号
