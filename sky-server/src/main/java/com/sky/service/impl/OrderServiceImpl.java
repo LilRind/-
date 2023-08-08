@@ -1,5 +1,6 @@
 package com.sky.service.impl;
 
+import com.alibaba.druid.support.json.JSONUtils;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
@@ -21,18 +22,24 @@ import com.sky.vo.OrderPaymentVO;
 import com.sky.vo.OrderStatisticsVO;
 import com.sky.vo.OrderSubmitVO;
 import com.sky.vo.OrderVO;
+import com.sky.websocket.WebSocketServer;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.Response;
 import org.apache.commons.lang.RandomStringUtils;
+import org.apache.http.entity.ContentType;
 import org.aspectj.weaver.ast.Or;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.annotation.Order;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
+import javax.servlet.http.HttpServletResponse;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,6 +63,8 @@ public class OrderServiceImpl implements OrderService {
     private UserMapper userMapper;
     @Autowired
     private WeChatPayUtil weChatPayUtil;
+    @Autowired
+    private WebSocketServer webSocketServer;
 
     @Value("${sky.shop.address}")
     private String shopAddress;
@@ -93,27 +102,30 @@ public class OrderServiceImpl implements OrderService {
         }
 
         //2.向订单插入1条数据
-        Orders orders = new Orders();
-        BeanUtils.copyProperties(ordersSubmitDTO, orders);
-        orders.setOrderTime(LocalDateTime.now());
-        orders.setPayStatus(Orders.UN_PAID);
-        orders.setStatus(Orders.PENDING_PAYMENT);
-        orders.setNumber(String.valueOf(System.currentTimeMillis()));
-        orders.setPhone(addressBook.getPhone());
-        orders.setConsignee(addressBook.getConsignee());
-        orders.setUserId(userId);
+        Orders order = new Orders();
+        BeanUtils.copyProperties(ordersSubmitDTO, order);
+        order.setPhone(addressBook.getPhone());
+        order.setAddress(addressBook.getDetail());
+        order.setConsignee(addressBook.getConsignee());
+        order.setNumber(String.valueOf(System.currentTimeMillis()));
+        order.setUserId(userId);
+        order.setStatus(Orders.PENDING_PAYMENT);
+        order.setPayStatus(Orders.UN_PAID);
+        order.setOrderTime(LocalDateTime.now());
 
-        orderMapper.insert(orders);
+        //向订单表插入1条数据
+        orderMapper.insert(order);
 
         List<OrderDetail> orderDetailList = new ArrayList<>();
         //3.向订单明细表插入n条数据
         for (ShoppingCart cart : shoppingCartList) {
             OrderDetail orderDetail = new OrderDetail();//订单明细
             BeanUtils.copyProperties(cart, orderDetail);
-            orderDetail.setOrderId(orders.getId());//设置当前订单明细关联的id
+            orderDetail.setOrderId(order.getId());//设置当前订单明细关联的id
             orderDetailList.add(orderDetail);
         }
 
+        //向明细表插入n条数据
         orderDetailMapper.insertBatch(orderDetailList);
 
         //4.清空当前用户的购物车数据
@@ -121,10 +133,10 @@ public class OrderServiceImpl implements OrderService {
 
         //5.封装VO返回结果
         OrderSubmitVO orderSubmitVO = OrderSubmitVO.builder()
-                .id(orders.getId())
-                .orderNumber(orders.getNumber())
-                .orderAmount(orders.getAmount())
-                .orderTime(orders.getOrderTime())
+                .id(order.getId())
+                .orderNumber(order.getNumber())
+                .orderAmount(order.getAmount())
+                .orderTime(order.getOrderTime())
                 .build();
 
         return orderSubmitVO;
@@ -141,7 +153,7 @@ public class OrderServiceImpl implements OrderService {
         Long userId = BaseContext.getCurrentId();
         User user = userMapper.getById(userId);
 
-        //调用微信支付接口，生成预支付交易单
+        //5. 调用微信支付接口，生成预支付交易单
         JSONObject jsonObject = weChatPayUtil.pay(
                 ordersPaymentDTO.getOrderNumber(), //商户订单号
                 new BigDecimal(0.01), //支付金额，单位 元
@@ -160,7 +172,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     /**
-     * 不调用微信接口的订单支付
+     * 不调用微信接口的订单支付。下单即付款成功
      *
      * @param ordersPaymentDTO
      * @return
@@ -175,6 +187,36 @@ public class OrderServiceImpl implements OrderService {
                 .packageStr("")
                 .build();
         return vo;
+    }
+
+    // TODO
+    /**
+     * 跳过微信支付，修改订单状态
+     * @param outTradeNo
+     */
+    public void delayedPaySuccess(String outTradeNo){
+
+        // 根据订单号查询订单
+        Orders ordersDB = orderMapper.getByNumber(outTradeNo);
+
+        // 根据订单id更新订单的状态、支付方式、支付状态、结账时间
+        Orders orders = Orders.builder()
+                .id(ordersDB.getId())
+                .status(Orders.TO_BE_CONFIRMED)
+                .payStatus(Orders.PAID)
+                .checkoutTime(LocalDateTime.now())
+                .build();
+
+        orderMapper.update(orders);
+
+        //通过websocket向客户端浏览器推送消息 type orderId content
+        Map map = new HashMap();
+        map.put("type", Orders.INCOMING_ORDERS); // 1表示来单提醒 2表示客户催单
+        map.put("orderId", ordersDB.getId());
+        map.put("content","订单号："+outTradeNo);
+
+        String json = JSON.toJSONString(map);
+        webSocketServer.sendToAllClient(json);
     }
 
     /**
@@ -196,6 +238,15 @@ public class OrderServiceImpl implements OrderService {
                 .build();
 
         orderMapper.update(orders);
+
+        //通过websocket向客户端浏览器推送消息 type orderId content
+        Map map = new HashMap();
+        map.put("type", 1); // 1表示来单提醒 2表示客户催单
+        map.put("orderId", ordersDB.getId());
+        map.put("content","订单号："+outTradeNo);
+
+        String json = JSON.toJSONString(map);
+        webSocketServer.sendToAllClient(json);
     }
 
     /**
@@ -240,12 +291,14 @@ public class OrderServiceImpl implements OrderService {
 
     /**
      * 查询订单详情
+     *
      * @param id
      * @return
      */
     public OrderVO details(Long id) {
         // 根据id查询订单
         Orders orders = orderMapper.getById(id);
+
         // 查询该订单对应的菜品/套餐明细
         List<OrderDetail> orderDetailList = orderDetailMapper.getByOrderId(orders.getId());
 
@@ -257,6 +310,7 @@ public class OrderServiceImpl implements OrderService {
         return orderVO;
     }
 
+
     /**
      * 用户取消订单
      * @param id
@@ -266,7 +320,7 @@ public class OrderServiceImpl implements OrderService {
         Orders ordersDB = orderMapper.getById(id);
 
         // 校验订单是否存在
-        if(ordersDB != null){
+        if(ordersDB == null){
             // 订单不存在，抛出异常
             throw new OrderBusinessException(MessageConstant.ORDER_NOT_FOUND);
         }
@@ -297,11 +351,11 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 更新订单状态、取消原因、取消时间
-        ordersDB.setStatus(Orders.CANCELLED);
+        orders.setStatus(Orders.CANCELLED);
         // 原本这里是"用户取消"，改为常量
-        ordersDB.setCancelReason(Orders.USER_CANCELLED);
+        orders.setCancelReason(Orders.USER_CANCELLED);
         orders.setCancelTime(LocalDateTime.now());
-        orderMapper.update(ordersDB);
+        orderMapper.update(orders);
 
     }
 
@@ -365,7 +419,7 @@ public class OrderServiceImpl implements OrderService {
         OrderStatisticsVO orderStatisticsVO = new OrderStatisticsVO();
         orderStatisticsVO.setToBeConfirmed(toBeConfirmed);
         orderStatisticsVO.setConfirmed(confirmed);
-        orderStatisticsVO.setConfirmed(deliveryInProgress);
+        orderStatisticsVO.setDeliveryInProgress(deliveryInProgress);
 
         return orderStatisticsVO;
     }
@@ -417,7 +471,7 @@ public class OrderServiceImpl implements OrderService {
         orders.setCancelTime(LocalDateTime.now());
 
         //调用更改订单数据状态方法
-        orderMapper.update(ordersDB);
+        orderMapper.update(orders);
     }
 
     /**

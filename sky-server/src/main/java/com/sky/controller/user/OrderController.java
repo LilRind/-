@@ -12,6 +12,7 @@ import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.*;
 
 @RestController("userOrderController")
@@ -58,9 +59,8 @@ public class OrderController {
         log.info("订单支付：{}", ordersPaymentDTO);
         OrderPaymentVO orderPaymentVO = orderService.paymentWithoutWx(ordersPaymentDTO);
         log.info("生成预支付交易单：{}", orderPaymentVO);
-        //通过订单号修改订单的支付状态。之后更改为一个定时任务
-        // TODO
-        orderService.paySuccess(ordersPaymentDTO.getOrderNumber());
+        //修改订单状态
+        orderService.delayedPaySuccess(ordersPaymentDTO.getOrderNumber());
         return Result.success(orderPaymentVO);
     }
 
@@ -76,7 +76,7 @@ public class OrderController {
     @ApiOperation("查询订单详情")
     public Result<OrderVO> details(@PathVariable("id") Long id) {
         OrderVO orderVO = orderService.details(id);
-        return Result.success();
+        return Result.success(orderVO);
     }
 
     /**

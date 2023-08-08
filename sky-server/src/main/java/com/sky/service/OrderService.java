@@ -38,6 +38,12 @@ public interface OrderService {
     void paySuccess(String outTradeNo);
 
     /**
+     * 支付成功（不调用 “微信支付”），修改订单状态
+     * @param outTradeNo
+     */
+    void delayedPaySuccess(String outTradeNo);
+
+    /**
      * 分页条件查询并按下单时间排序
      * @param page
      * @param pageSize

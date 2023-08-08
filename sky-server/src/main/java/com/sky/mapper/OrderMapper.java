@@ -33,8 +33,6 @@ public interface OrderMapper {
     @Select("select * from orders where number = #{orderNumber}")
     Orders getByNumber(String orderNumber);
 
-
-
     /**
      * 修改订单信息
      * @param orders
@@ -51,9 +49,8 @@ public interface OrderMapper {
     /**
      * 根据状态统计订单数量
      * @param status
-     * @return
      */
-    @Select("select * from orders where status = #{status}")
+    @Select("select count(id) from orders where status = #{status}")
     Integer countStatus(Integer status);
 
     /**

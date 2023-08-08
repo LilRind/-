@@ -42,6 +42,13 @@ public class Orders implements Serializable {
      */
     public static final String USER_CANCELLED = "用户取消";
 
+    /**
+     * 订单提醒 1来单提醒 2客户催单
+     */
+    public static final int INCOMING_ORDERS = 1;
+    public static final int CUSTOMER_REMINDER = 2;
+
+
     private Long id;
 
     //订单号

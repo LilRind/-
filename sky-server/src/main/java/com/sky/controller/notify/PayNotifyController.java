@@ -54,9 +54,10 @@ public class PayNotifyController {
         //业务处理，修改订单状态、来单提醒
         orderService.paySuccess(outTradeNo);
 
-        //给微信响应
+        //给“微信”响应
         responseToWeixin(response);
     }
+
 
     /**
      * 读取数据
